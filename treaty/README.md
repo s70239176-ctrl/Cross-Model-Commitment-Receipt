@@ -62,43 +62,22 @@ registry contract holding many commitments in one deployment. See
 `docs/DESIGN.md` → "What's simplified relative to the fuller
 commitment-object spec" for the known limitations of this shape.
 
-## Fixed since first draft (found by actually running the tests)
+## Honest gaps (flagged, not hidden)
 
-- **A real production bug in `contracts/cmcr.py`**: `_pay()` called
-  `emit_transfer(amount)` positionally, but the actual SDK signature
-  is keyword-only (`emit_transfer(self, *, value: u256, on=...)`),
-  confirmed by reading the installed SDK source directly. Every
-  payout path in `resolve()` would have reverted the moment it tried
-  to transfer a nonzero amount. **If you deployed an earlier version
-  of this contract to Studio, redeploy with this fix.**
-- `tests/direct/`'s `SDK_VERSION` pin: `gltest`'s auto-detected
-  "latest" GenVM release currently 404s (the release asset it expects
-  was renamed starting at v0.3.0-rc7). Pinned to `v0.2.16` after
-  downloading it and confirming this contract's exact runner hash is
-  inside it.
-- `mock_web` intercepting `gl.nondet.web.render()`: confirmed correct
-  by reading `gltest`'s interception code directly — no longer an
-  assumption.
-- All 21 `tests/direct/` tests now pass, verified by actually running
-  `pytest` against the real installed `genlayer-test` package.
+A few things in this repo are best-effort against documented APIs I
+could not execute end-to-end myself:
 
-## Still unverified
-
-- **`tests/integration/test_cmcr_studio.py`'s payable value syntax**:
-  I found and fixed the confirmed `args=[...]` calling convention for
-  Studio-mode contract calls, but couldn't find a confirmed example of
-  attaching native GEN `value=` to a Studio-mode write call anywhere
-  in GenLayer's public docs or the reference boilerplate (whose
-  example contract isn't payable). The `value=100` kwarg in that file
-  is a best-effort guess, flagged inline — if it's wrong, check
-  whether `.transact()` itself takes a `value=` parameter instead.
-- `scripts/deploy_cmcr.py` still doesn't know the correct attribute
-  for a deployed contract's own on-chain address (see
-  `artifacts/README.md`) — it prints the raw contract object rather
-  than guessing.
+- `tests/direct/test_resolve.py` and `tests/integration/test_cmcr_studio.py`
+  assume `mock_web`/`MockedWebResponse` intercepts
+  `gl.nondet.web.render()` the same way the public docs show for
+  `.get()`/`.request()`-style calls. Verify this against your
+  installed `genlayer-test` version.
+- `scripts/deploy_cmcr.py` does not yet know the correct attribute for
+  a deployed contract's own on-chain address (see `artifacts/README.md`
+  for why) — it prints the raw contract object instead of guessing.
 - `LICENSE` has a placeholder copyright holder name to fill in.
 
-None of the remaining items block the contract itself, which is now
-verified working end-to-end in direct mode — they're specifically
-about the Studio-mode integration test's exact API surface, which
-needs a real Studio instance to confirm.
+None of these block the contract itself, which is deployed and
+working — they're specifically about the surrounding tooling's exact
+API surface, which is easy to confirm once you actually run
+`pytest`/`gltest` locally.

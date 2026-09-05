@@ -1,0 +1,28 @@
+networks:
+  default: localnet
+
+  localnet:
+    url: "http://127.0.0.1:4000/api"
+    leader_only: false
+
+  studionet: {}
+  # Pre-configured by gltest -- accounts auto-generated
+
+  # testnet_asimov is deliberately omitted: gltest validates every
+  # configured network's env vars up front, even ones you're not
+  # using, so leaving this in breaks `pytest tests/direct/` (which
+  # needs no network at all) until ACCOUNT_PRIVATE_KEY_1/_2 exist.
+  # Uncomment and create a .env with real funded keys only when you're
+  # actually ready to deploy to testnet_asimov:
+  #
+  # testnet_asimov:
+  #   accounts:
+  #     - "${ACCOUNT_PRIVATE_KEY_1}"
+  #     - "${ACCOUNT_PRIVATE_KEY_2}"
+  #   from: "${ACCOUNT_PRIVATE_KEY_1}"
+
+paths:
+  contracts: "contracts"
+  artifacts: "artifacts"
+
+environment: .env

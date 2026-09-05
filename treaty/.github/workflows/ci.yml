@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    paths:
+      - "contracts/**"
+      - "tests/direct/**"
+      - "requirements.txt"
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "tests/direct/**"
+      - "requirements.txt"
+
+jobs:
+  direct-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Compile-check all contract files
+        run: |
+          for f in contracts/*.py; do
+            echo "Checking $f"
+            python -m py_compile "$f"
+          done
+
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run direct-mode tests (no Docker/Studio required)
+        run: pytest tests/direct/ -v
+
+  # tests/integration/ needs a running GenLayer Studio (Docker) and is
+  # deliberately NOT run here -- run it locally with:
+  #   gltest tests/integration/ -v -s
