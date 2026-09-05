@@ -1,7 +1,0 @@
-# GenLayer testing suite: provides pytest fixtures (direct_vm,
-# direct_deploy, ...) for tests/direct/, and the gltest CLI +
-# get_contract_factory / get_validator_factory for tests/integration/
-# and scripts/deploy_cmcr.py.
-genlayer-test>=0.29.2
-
-pytest>=8.0
