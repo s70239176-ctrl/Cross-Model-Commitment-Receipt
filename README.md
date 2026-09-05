@@ -1,4 +1,4 @@
-# treaty — Cross-Model Commitment Receipt (CMCR)
+# Cross-Model Commitment Receipt (CMCR)
 
 An on-chain GenLayer Intelligent Contract primitive that binds a
 committer to a structured, falsifiable claim about the world, frozen
