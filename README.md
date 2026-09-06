@@ -41,9 +41,27 @@ pip install -r requirements.txt
 # Fast, no Docker required:
 pytest tests/direct/ -v
 
-# Full consensus validation (requires GenLayer Studio running):
+# Full consensus validation -- requires GenLayer Studio actually
+# running first (see "Starting GenLayer Studio" below):
 gltest tests/integration/ -v -s
 ```
+
+### Starting GenLayer Studio (needed for `tests/integration/` only)
+
+`tests/direct/` never needs this -- only `tests/integration/` and
+manual Studio deployment do. Requires Docker 26+ and Node.js 18+.
+
+```bash
+npm install -g genlayer
+genlayer init      # first time only -- pulls containers, prompts for
+                    # an LLM provider/API key
+genlayer up         # starts Studio; leave this running
+```
+
+Studio's UI is then at `http://localhost:8080`, and its RPC API at
+`http://127.0.0.1:4000/api` -- the same URL already configured in
+`gltest.config.yaml`. Run `gltest tests/integration/ -v -s` in a
+second terminal once `genlayer up` reports it's ready.
 
 1. Read `docs/DESIGN.md` for the threat model and why the contract's
    consensus logic is shaped the way it is.

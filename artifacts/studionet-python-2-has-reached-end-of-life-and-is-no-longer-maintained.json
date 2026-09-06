@@ -1,0 +1,11 @@
+{
+  "network": "studionet",
+  "address": "0xd2B8cB082e98543fA558D41d326Bc34db4cdbE7F",
+  "deployer": "FILL_IN_YOUR_DEPLOYER_ADDRESS",
+  "predicate": "Python 2 has reached end-of-life and is no longer maintained by the CPython core team",
+  "canonical_url": "https://www.python.org/doc/sunset-python-2/",
+  "corroborating_url": "https://devguide.python.org/versions/",
+  "required_signal": "a statement that Python 2 is end-of-life / no longer supported",
+  "falsifier": "a statement that Python 2 is still actively supported or maintained",
+  "challenge_window_days": 7
+}

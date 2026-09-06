@@ -8,6 +8,12 @@ import datetime
 # constructing it explicitly is what actually works here.
 _ZERO_ADDRESS = Address("0x0000000000000000000000000000000000000000")
 
+# Closed set of page_state values a source extraction may report.
+# "stale" and "unreachable" are both treated as non-evidentiary in
+# reduce_verdict() -- see the settlement-semantics comment there for
+# why staleness isn't silently ignored the way it used to be.
+_VALID_PAGE_STATES = {"fresh", "stale", "unreachable"}
+
 
 class Contract(gl.Contract):
     committer: Address
@@ -157,16 +163,34 @@ Return ONLY JSON:
   "has_falsifier": bool,
   "page_state": "fresh" | "stale" | "unreachable"
 }}
-page_state is "unreachable" if the page is empty, an error, a block page, or unrelated.
+page_state is "unreachable" if the page is empty, an error, a block page, or
+unrelated to the subject entirely.
+page_state is "stale" if the page loaded but shows visible signs the content
+is a cached or outdated snapshot -- e.g. a "last updated"/"cached on" date
+that looks old relative to the claim, an explicit notice that the content
+may be out of date, or a version/date banner inconsistent with the page
+being current.
+page_state is "fresh" only if none of the above apply -- a normal, current,
+directly-served page.
 No markdown.
 """
             raw = gl.nondet.exec_prompt(prompt)
             raw = raw.replace("```json", "").replace("```", "").strip()
             data = json.loads(raw)
+            # Clamp page_state to the closed enum instead of trusting
+            # whatever string the model returns. An unparseable or
+            # off-enum value (e.g. "unknown", "partial") is treated as
+            # the most conservative state -- "unreachable" -- rather
+            # than silently becoming a fourth, unhandled page_state
+            # that could slip past the "== fresh" check below or, worse,
+            # coincidentally match between two sources and be waved
+            # through as "aligned".
+            raw_page_state = str(data.get("page_state", "unreachable") or "unreachable")
+            page_state = raw_page_state if raw_page_state in _VALID_PAGE_STATES else "unreachable"
             out = {
                 "has_required": bool(data.get("has_required", False)),
                 "has_falsifier": bool(data.get("has_falsifier", False)),
-                "page_state": str(data.get("page_state", "unreachable")),
+                "page_state": page_state,
             }
             return json.dumps(out, sort_keys=True)
 
@@ -200,9 +224,20 @@ required signal or falsifier that the page text does not actually contain.
 
         # ---- Step B: one deterministic reduction, locked by strict_eq ----
         def reduce_verdict(canonical=canonical, corroborating=corroborating) -> str:
+            # SETTLEMENT SEMANTICS FOR STALE PAGES: a source is only
+            # usable as evidence if it is "fresh". "stale" is NOT
+            # treated as equivalent to "fresh" here -- a cached or
+            # outdated page is exactly the source-rot scenario this
+            # contract's own threat model names ("committer wants
+            # holds after the world moved... quietly edited page,
+            # stale cache"), so it must not silently pass through and
+            # contribute to a holds/broken verdict. Any source that is
+            # stale OR unreachable makes the pair non-evidentiary and
+            # forces "inconclusive" -- only two agreeing "fresh"
+            # sources can produce holds or broken.
             pages_unusable = (
-                canonical["page_state"] == "unreachable"
-                or corroborating["page_state"] == "unreachable"
+                canonical["page_state"] != "fresh"
+                or corroborating["page_state"] != "fresh"
             )
             pages_conflict = (
                 canonical["has_required"] != corroborating["has_required"]
@@ -223,6 +258,8 @@ required signal or falsifier that the page text does not actually contain.
                 "corroborating_has_required": corroborating["has_required"],
                 "canonical_has_falsifier": canonical["has_falsifier"],
                 "corroborating_has_falsifier": corroborating["has_falsifier"],
+                "canonical_page_state": canonical["page_state"],
+                "corroborating_page_state": corroborating["page_state"],
                 "pages_conflict": pages_conflict,
                 "pages_unusable": pages_unusable,
                 "decision": decision,

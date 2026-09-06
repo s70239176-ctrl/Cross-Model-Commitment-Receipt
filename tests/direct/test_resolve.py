@@ -197,6 +197,69 @@ def test_resolve_inconclusive_on_unreachable_source(
     assert extract["pages_unusable"] is True
 
 
+def test_resolve_inconclusive_when_a_source_is_stale(
+    direct_deploy, direct_vm, direct_owner, direct_alice
+):
+    """Settlement-semantics hardening: a source reporting 'stale' must
+    NOT be treated as equivalent to 'fresh' -- both sources here agree
+    on has_required/has_falsifier, so before this fix the pair would
+    have fallen through as 'aligned' and produced 'holds' off a page
+    the extraction itself flagged as a stale/cached snapshot."""
+    contract = _deploy_and_challenge(direct_deploy, direct_vm, direct_owner, direct_alice)
+    _mock_pages(
+        direct_vm,
+        "Python 2 reached its end of life on January 1, 2020. (cached copy, last updated 2015)",
+        "Only Python 3.x branches are currently maintained.",
+    )
+    _mock_extractions(
+        direct_vm,
+        {"has_required": True, "has_falsifier": False, "page_state": "stale"},
+        {"has_required": True, "has_falsifier": False, "page_state": "fresh"},
+    )
+
+    with direct_vm.prank(direct_owner):
+        decision = contract.resolve()
+
+    assert decision == "inconclusive"
+    extract = json.loads(json.loads(contract.get_case())["extract_json"])
+    assert extract["pages_unusable"] is True
+    assert extract["canonical_page_state"] == "stale"
+
+
+def test_resolve_clamps_invalid_page_state_to_unreachable(
+    direct_deploy, direct_vm, direct_owner, direct_alice
+):
+    """Type-validation hardening: an off-enum page_state (something
+    other than fresh/stale/unreachable) must be clamped to
+    'unreachable' rather than accepted verbatim -- otherwise two
+    sources hallucinating the SAME invalid value (e.g. "unknown")
+    would compare as a single, self-consistent state and be waved
+    through as 'aligned' despite being nonsense."""
+    contract = _deploy_and_challenge(direct_deploy, direct_vm, direct_owner, direct_alice)
+    _mock_pages(
+        direct_vm,
+        "Python 2 reached its end of life on January 1, 2020.",
+        "Only Python 3.x branches are currently maintained.",
+    )
+    # Both sources return the SAME invalid page_state value. If it were
+    # accepted verbatim instead of clamped, states would compare equal
+    # and this would incorrectly resolve as "aligned" -> "holds".
+    _mock_extractions(
+        direct_vm,
+        {"has_required": True, "has_falsifier": False, "page_state": "unknown"},
+        {"has_required": True, "has_falsifier": False, "page_state": "unknown"},
+    )
+
+    with direct_vm.prank(direct_owner):
+        decision = contract.resolve()
+
+    assert decision == "inconclusive"
+    extract = json.loads(json.loads(contract.get_case())["extract_json"])
+    assert extract["canonical_page_state"] == "unreachable"
+    assert extract["corroborating_page_state"] == "unreachable"
+    assert extract["pages_unusable"] is True
+
+
 def test_double_resolve_reverts(direct_deploy, direct_vm, direct_owner, direct_alice):
     contract = _deploy_and_challenge(direct_deploy, direct_vm, direct_owner, direct_alice)
     _mock_pages(

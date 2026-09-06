@@ -97,6 +97,33 @@ There is nothing for `resolve()` to selectively "ignore" because
 nothing narrative is ever stored — the only way to affect the verdict
 is to have staked correctly on what the frozen sources actually say.
 
+## Extraction type-safety and how staleness affects settlement
+
+Every field a validator's extraction reports is validated, not
+trusted verbatim:
+
+- `has_required` / `has_falsifier` are coerced to `bool`.
+- `page_state` is checked against a closed enum
+  (`{"fresh", "stale", "unreachable"}`) inside `_extract_source()`.
+  Any off-enum or unparseable value is clamped to `"unreachable"` —
+  the most conservative state — rather than accepted as a novel
+  fourth state. This matters concretely: if two sources both
+  hallucinated the same nonsense value (e.g. `"unknown"`) and it were
+  accepted verbatim, `reduce_verdict()`'s equality check would see
+  matching states and could wave the pair through as usable evidence.
+  Clamping first closes that off.
+
+**Settlement rule for `page_state`:** only `"fresh"` counts as
+usable evidence. A source reporting `"stale"` is treated exactly like
+`"unreachable"` — either one makes the pair non-evidentiary and forces
+`inconclusive`, never `holds` or `broken`. This is a deliberate
+tightening: a stale or cached page is precisely the source-rot
+scenario named in this document's own threat model (a committer
+hoping resolution reads a quietly-outdated snapshot instead of the
+live page), so staleness cannot be allowed to silently pass as
+equivalent to a current page just because two validators agree on
+what the cache says.
+
 ## Mechanical payoff
 
 `resolve()`'s payout branch is a fixed `if/elif` on `decision`, no
@@ -132,6 +159,7 @@ constructor examples.
 | Clear state design | `status` field + exact state machine above, enforced by explicit guards in every write method |
 | Predicate/sources/signals frozen at commit time | Constructor sets them; no method ever reassigns |
 | Independent live fetch, not trusted narrative | `gl.nondet.web.render(url, mode="text")` inside `_extract_source()`, run per-validator by the equivalence principle; no challenge-brief field exists to bypass this |
+| Extraction fields validated, not trusted verbatim; stale sources can't pass as fresh | `_extract_source()` clamps `page_state` to a closed enum; `reduce_verdict()` requires `"fresh"` specifically (not just non-`"unreachable"`) to count as evidence |
 | Mechanical, status-driven payoff | Fixed `if/elif` on `decision` inside `resolve()` |
 | No re-resolve / no source or signal edit | `resolve()`'s status guard; no setters exist for frozen fields |
 | Optional `extend_window`, payer-only, pre-challenge, typed state transition | `extend_window()` |
